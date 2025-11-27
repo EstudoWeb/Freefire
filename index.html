@@ -336,6 +336,107 @@
             display: none;
             z-index: 400;
         }
+        
+        /* Controles Mobile */
+        .touch-joystick {
+            position: fixed;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+            user-select: none;
+            z-index: 300;
+            opacity: 0.8;
+        }
+        
+        .touch-joystick.active {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.7);
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .joystick-thumb {
+            width: 60%;
+            height: 60%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            transition: transform 0.1s ease;
+        }
+        
+        .shoot-button {
+            position: absolute;
+            right: 15%;
+            top: 15%;
+            width: 40%;
+            height: 40%;
+            border-radius: 50%;
+            background: rgba(255, 0, 0, 0.7);
+            border: 2px solid rgba(255, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+        }
+        
+        .touch-interact {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 215, 0, 0.8);
+            border: 3px solid rgba(255, 215, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.8);
+            cursor: pointer;
+            touch-action: none;
+            user-select: none;
+            z-index: 300;
+            opacity: 0.9;
+            display: none;
+        }
+        
+        .touch-interact:active {
+            transform: scale(0.95);
+            opacity: 1;
+        }
+        
+        /* Esconder controles PC em mobile */
+        body.mobile-mode .crosshair {
+            display: none;
+        }
+        
+        body.mobile-mode .hud .weapon-slot {
+            display: none;
+        }
+        
+        body.mobile-mode .hud .fixed.bottom-20.right-4 {
+            display: none;
+        }
+        
+        body.mobile-mode .hud .fixed.bottom-4.right-4 {
+            display: none;
+        }
+        
+        body.mobile-mode .hud .fixed.bottom-32.right-20 {
+            display: none;
+        }
+        
+        /* Controles mobile mostram apenas quando necessário */
+        body.mobile-mode .hud .fixed.top-4.left-4,
+        body.mobile-mode .hud .fixed.bottom-20.left-4,
+        body.mobile-mode .hud .minimap {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -590,7 +691,13 @@
             walls: [], // Muros para cobertura
             botNames: ['Destroyer', 'Ninja', 'Shadow', 'Hunter', 'Killer', 'Sniper', 'Ghost', 'Warrior', 'Legend', 'Pro', 'Ace', 'Master', 'Elite', 'Alpha', 'Omega', 'Phoenix', 'Dragon', 'Tiger', 'Wolf', 'Eagle', 'Hawk', 'Viper', 'Cobra', 'Panther', 'Lion', 'Bear', 'Shark', 'Rex', 'Storm', 'Fire', 'Ice', 'Thunder', 'Lightning', 'Blaze', 'Frost', 'Dark', 'Light', 'Mystic', 'Savage', 'Brutal', 'Fierce', 'Swift', 'Silent', 'Deadly', 'Fatal', 'Toxic', 'Cyber', 'Nano', 'Mega'],
             totalDamageDealt: 0,
-            nearbyLoot: null
+            nearbyLoot: null,
+            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768,
+            touchControls: {
+                move: { active: false, x: 0, y: 0 },
+                shoot: { active: false, x: 0, y: 0 },
+                shootButton: { pressed: false }
+            }
         };
 
         // Classe do Jogador
@@ -1887,6 +1994,12 @@
             game.canvas.width = game.width;
             game.canvas.height = game.height;
             
+            // Se for mobile, esconder controles de PC e mostrar controles touch
+            if (game.isMobile) {
+                document.body.classList.add('mobile-mode');
+                setupTouchControls();
+            }
+            
             window.addEventListener('resize', () => {
                 game.width = window.innerWidth;
                 game.height = window.innerHeight;
@@ -3027,6 +3140,204 @@
         }
 
         window.addEventListener('load', initGame);
+        
+        // Configurar controles touch para mobile
+        function setupTouchControls() {
+            const canvas = game.canvas;
+            
+            // Joystick de movimento (esquerda)
+            const moveJoystick = document.createElement('div');
+            moveJoystick.className = 'touch-joystick move-joystick';
+            moveJoystick.innerHTML = '<div class="joystick-thumb"></div>';
+            document.body.appendChild(moveJoystick);
+            
+            // Joystick de tiro (direita)
+            const shootJoystick = document.createElement('div');
+            shootJoystick.className = 'touch-joystick shoot-joystick';
+            shootJoystick.innerHTML = '<div class="joystick-thumb"></div><div class="shoot-button">🔴</div>';
+            document.body.appendChild(shootJoystick);
+            
+            // Botão de interação
+            const interactBtn = document.createElement('div');
+            interactBtn.className = 'touch-interact';
+            interactBtn.textContent = 'E';
+            document.body.appendChild(interactBtn);
+            
+            // Posicionar controles
+            const joystickSize = Math.min(game.width, game.height) * 0.25;
+            const buttonSize = joystickSize * 0.6;
+            
+            moveJoystick.style.width = joystickSize + 'px';
+            moveJoystick.style.height = joystickSize + 'px';
+            moveJoystick.style.left = '20px';
+            moveJoystick.style.bottom = '20px';
+            
+            shootJoystick.style.width = joystickSize + 'px';
+            shootJoystick.style.height = joystickSize + 'px';
+            shootJoystick.style.right = '20px';
+            shootJoystick.style.bottom = '20px';
+            
+            interactBtn.style.width = buttonSize + 'px';
+            interactBtn.style.height = buttonSize + 'px';
+            interactBtn.style.left = '50%';
+            interactBtn.style.top = '20px';
+            interactBtn.style.transform = 'translateX(-50%)';
+            
+            // Lógica de toque para movimento
+            let moveTouchId = null;
+            let moveCenterX = 0;
+            let moveCenterY = 0;
+            
+            moveJoystick.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                moveTouchId = touch.identifier;
+                moveCenterX = touch.clientX;
+                moveCenterY = touch.clientY;
+                moveJoystick.classList.add('active');
+            });
+            
+            moveJoystick.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let touch of e.touches) {
+                    if (touch.identifier === moveTouchId) {
+                        const dx = touch.clientX - moveCenterX;
+                        const dy = touch.clientY - moveCenterY;
+                        const distance = Math.min(Math.hypot(dx, dy), joystickSize / 2);
+                        const angle = Math.atan2(dy, dx);
+                        
+                        // Atualizar visual do joystick
+                        const thumb = moveJoystick.querySelector('.joystick-thumb');
+                        const offset = Math.min(distance / (joystickSize / 2), 0.7);
+                        thumb.style.transform = `translate(${Math.cos(angle) * offset * 50}px, ${Math.sin(angle) * offset * 50}px)`;
+                        
+                        // Mover jogador
+                        const speed = game.player ? (game.player.isCrouching ? 2.5 : 5) : 5;
+                        const moveX = Math.cos(angle) * speed * offset;
+                        const moveY = Math.sin(angle) * speed * offset;
+                        
+                        game.keys['w'] = moveY < 0;
+                        game.keys['s'] = moveY > 0;
+                        game.keys['a'] = moveX < 0;
+                        game.keys['d'] = moveX > 0;
+                        
+                        break;
+                    }
+                }
+            });
+            
+            moveJoystick.addEventListener('touchend', (e) => {
+                if (e.targetTouches.length === 0 || Array.from(e.changedTouches).some(t => t.identifier === moveTouchId)) {
+                    moveTouchId = null;
+                    moveJoystick.classList.remove('active');
+                    moveJoystick.querySelector('.joystick-thumb').style.transform = 'translate(0, 0)';
+                    
+                    // Parar movimento
+                    game.keys['w'] = false;
+                    game.keys['s'] = false;
+                    game.keys['a'] = false;
+                    game.keys['d'] = false;
+                }
+            });
+            
+            // Lógica de toque para tiro
+            let shootTouchId = null;
+            let shootCenterX = 0;
+            let shootCenterY = 0;
+            let isShootingTouch = false;
+            
+            shootJoystick.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                shootTouchId = touch.identifier;
+                shootCenterX = touch.clientX;
+                shootCenterY = touch.clientY;
+                shootJoystick.classList.add('active');
+            });
+            
+            shootJoystick.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let touch of e.touches) {
+                    if (touch.identifier === shootTouchId) {
+                        const dx = touch.clientX - shootCenterX;
+                        const dy = touch.clientY - shootCenterY;
+                        const distance = Math.min(Math.hypot(dx, dy), joystickSize / 2);
+                        const angle = Math.atan2(dy, dx);
+                        
+                        // Atualizar visual do joystick
+                        const thumb = shootJoystick.querySelector('.joystick-thumb');
+                        const offset = Math.min(distance / (joystickSize / 2), 0.7);
+                        thumb.style.transform = `translate(${Math.cos(angle) * offset * 50}px, ${Math.sin(angle) * offset * 50}px)`;
+                        
+                        // Atualizar mira
+                        game.mouse.x = touch.clientX;
+                        game.mouse.y = touch.clientY;
+                        
+                        const crosshair = document.getElementById('crosshair');
+                        if (crosshair) {
+                            crosshair.style.left = touch.clientX - 15 + 'px';
+                            crosshair.style.top = touch.clientY - 15 + 'px';
+                        }
+                        
+                        break;
+                    }
+                }
+            });
+            
+            shootJoystick.addEventListener('touchend', (e) => {
+                if (e.targetTouches.length === 0 || Array.from(e.changedTouches).some(t => t.identifier === shootTouchId)) {
+                    shootTouchId = null;
+                    shootJoystick.classList.remove('active');
+                    shootJoystick.querySelector('.joystick-thumb').style.transform = 'translate(0, 0)';
+                    
+                    // Parar tiro
+                    isShootingTouch = false;
+                }
+            });
+            
+            // Botão de tiro
+            const shootButton = shootJoystick.querySelector('.shoot-button');
+            shootButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isShootingTouch = true;
+            });
+            
+            shootButton.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                isShootingTouch = false;
+            });
+            
+            // Botão de interação
+            interactBtn.addEventListener('click', () => {
+                collectLoot();
+            });
+            
+            // Atualizar botão de interação quando tem item próximo
+            const updateInteractButton = () => {
+                if (game.nearbyLoot) {
+                    interactBtn.style.display = 'flex';
+                    if (game.nearbyLoot.type === 'crate') {
+                        interactBtn.textContent = 'E';
+                    } else if (game.nearbyLoot.type === 'loot') {
+                        interactBtn.textContent = 'E';
+                    } else if (game.nearbyLoot.type === 'airdrop') {
+                        interactBtn.textContent = '📦';
+                    }
+                } else {
+                    interactBtn.style.display = 'none';
+                }
+            };
+            
+            // Atualizar botão periodicamente
+            setInterval(updateInteractButton, 100);
+            
+            // Atualizar loop de tiro touch
+            setInterval(() => {
+                if (isShootingTouch && game.isPlaying && game.player) {
+                    game.player.shoot();
+                }
+            }, 100);
+        }
     </script>
 </body>
 </html>
