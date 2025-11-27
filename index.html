@@ -437,6 +437,23 @@
         body.mobile-mode .hud .minimap {
             display: block;
         }
+        
+        /* Kill Feed no mobile posicionado no canto superior esquerdo */
+        body.mobile-mode .kill-feed {
+            position: fixed;
+            top: 60px;
+            left: 10px;
+            transform: none;
+            width: 280px;
+            max-height: 150px;
+            z-index: 99;
+        }
+        
+        body.mobile-mode .kill-notification {
+            font-size: 12px;
+            padding: 6px 10px;
+            margin: 2px 0;
+        }
     </style>
 </head>
 <body>
@@ -692,12 +709,11 @@
             botNames: ['Destroyer', 'Ninja', 'Shadow', 'Hunter', 'Killer', 'Sniper', 'Ghost', 'Warrior', 'Legend', 'Pro', 'Ace', 'Master', 'Elite', 'Alpha', 'Omega', 'Phoenix', 'Dragon', 'Tiger', 'Wolf', 'Eagle', 'Hawk', 'Viper', 'Cobra', 'Panther', 'Lion', 'Bear', 'Shark', 'Rex', 'Storm', 'Fire', 'Ice', 'Thunder', 'Lightning', 'Blaze', 'Frost', 'Dark', 'Light', 'Mystic', 'Savage', 'Brutal', 'Fierce', 'Swift', 'Silent', 'Deadly', 'Fatal', 'Toxic', 'Cyber', 'Nano', 'Mega'],
             totalDamageDealt: 0,
             nearbyLoot: null,
-            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768,
             touchControls: {
                 move: { active: false, x: 0, y: 0 },
                 shoot: { active: false, x: 0, y: 0 },
-                shootButton: { pressed: false },
-                shootAngle: 0 // Ângulo do tiro em mobile
+                shootButton: { pressed: false }
             }
         };
 
@@ -808,14 +824,9 @@
                 this.x = Math.max(this.radius, Math.min(game.map.width - this.radius, this.x));
                 this.y = Math.max(this.radius, Math.min(game.map.height - this.radius, this.y));
                 
-                // Em mobile, usar o ângulo do joystick de tiro para mirar
-                if (game.isMobile && game.touchControls.shoot.active) {
-                    this.angle = game.touchControls.shootAngle;
-                } else {
-                    const dx = game.mouse.x - (game.width / 2);
-                    const dy = game.mouse.y - (game.height / 2);
-                    this.angle = Math.atan2(dy, dx);
-                }
+                const dx = game.mouse.x - (game.width / 2);
+                const dy = game.mouse.y - (game.height / 2);
+                this.angle = Math.atan2(dy, dx);
                 
                 if (this.shootCooldown > 0) this.shootCooldown--;
                 
@@ -3251,7 +3262,6 @@
             let shootCenterX = 0;
             let shootCenterY = 0;
             let isShootingTouch = false;
-            let shootAngle = 0; // Ângulo do tiro
             
             shootJoystick.addEventListener('touchstart', (e) => {
                 e.preventDefault();
@@ -3269,12 +3279,12 @@
                         const dx = touch.clientX - shootCenterX;
                         const dy = touch.clientY - shootCenterY;
                         const distance = Math.min(Math.hypot(dx, dy), joystickSize / 2);
-                        shootAngle = Math.atan2(dy, dx); // Salvar ângulo do tiro
+                        const angle = Math.atan2(dy, dx);
                         
                         // Atualizar visual do joystick
                         const thumb = shootJoystick.querySelector('.joystick-thumb');
                         const offset = Math.min(distance / (joystickSize / 2), 0.7);
-                        thumb.style.transform = `translate(${Math.cos(shootAngle) * offset * 50}px, ${Math.sin(shootAngle) * offset * 50}px)`;
+                        thumb.style.transform = `translate(${Math.cos(angle) * offset * 50}px, ${Math.sin(angle) * offset * 50}px)`;
                         
                         // Atualizar mira
                         game.mouse.x = touch.clientX;
