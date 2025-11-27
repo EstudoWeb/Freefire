@@ -2046,26 +2046,30 @@
             });
             
             window.addEventListener('mousemove', (e) => {
-                game.mouse.x = e.clientX;
-                game.mouse.y = e.clientY;
-                
-                const crosshair = document.getElementById('crosshair');
-                if (crosshair) {
-                    crosshair.style.left = e.clientX - 15 + 'px';
-                    crosshair.style.top = e.clientY - 15 + 'px';
+                if (!game.isMobile) {
+                    game.mouse.x = e.clientX;
+                    game.mouse.y = e.clientY;
+                    
+                    const crosshair = document.getElementById('crosshair');
+                    if (crosshair) {
+                        crosshair.style.left = e.clientX - 15 + 'px';
+                        crosshair.style.top = e.clientY - 15 + 'px';
+                    }
                 }
             });
             
             let isShooting = false;
             
             window.addEventListener('mousedown', (e) => {
-                if (game.isPlaying && game.player) {
+                if (game.isPlaying && game.player && !game.isMobile) {
                     isShooting = true;
                 }
             });
             
             window.addEventListener('mouseup', (e) => {
-                isShooting = false;
+                if (!game.isMobile) {
+                    isShooting = false;
+                }
             });
             
             // Auto-fire quando segura o botão
@@ -3162,6 +3166,10 @@
         function setupTouchControls() {
             const canvas = game.canvas;
             
+            // Variáveis de controle mobile
+            let shootAngle = 0; // Ângulo de tiro calculado pelo joystick
+            let isAimingMobile = false; // Indica se está mirando pelo mobile
+            
             // Joystick de movimento (esquerda)
             const moveJoystick = document.createElement('div');
             moveJoystick.className = 'touch-joystick move-joystick';
@@ -3270,6 +3278,7 @@
                 shootCenterX = touch.clientX;
                 shootCenterY = touch.clientY;
                 shootJoystick.classList.add('active');
+                isAimingMobile = true;
             });
             
             shootJoystick.addEventListener('touchmove', (e) => {
@@ -3286,15 +3295,9 @@
                         const offset = Math.min(distance / (joystickSize / 2), 0.7);
                         thumb.style.transform = `translate(${Math.cos(angle) * offset * 50}px, ${Math.sin(angle) * offset * 50}px)`;
                         
-                        // Atualizar mira
-                        game.mouse.x = touch.clientX;
-                        game.mouse.y = touch.clientY;
-                        
-                        const crosshair = document.getElementById('crosshair');
-                        if (crosshair) {
-                            crosshair.style.left = touch.clientX - 15 + 'px';
-                            crosshair.style.top = touch.clientY - 15 + 'px';
-                        }
+                        // Calcular ângulo de tiro (para uso no shoot())
+                        shootAngle = angle;
+                        isAimingMobile = true;
                         
                         break;
                     }
@@ -3307,8 +3310,9 @@
                     shootJoystick.classList.remove('active');
                     shootJoystick.querySelector('.joystick-thumb').style.transform = 'translate(0, 0)';
                     
-                    // Parar tiro
+                    // Parar tiro e mira
                     isShootingTouch = false;
+                    isAimingMobile = false;
                 }
             });
             
@@ -3348,12 +3352,82 @@
             // Atualizar botão periodicamente
             setInterval(updateInteractButton, 100);
             
+            // Sistema anti-bugs profissional para tiro mobile
+            const mobileShootSystem = {
+                lastShotTime: 0,
+                shotCooldown: 100, // 100ms entre tiros
+                isValidShot: () => {
+                    const now = Date.now();
+                    return now - mobileShootSystem.lastShotTime >= mobileShootSystem.shotCooldown;
+                },
+                shoot: () => {
+                    if (mobileShootSystem.isValidShot() && game.isPlaying && game.player) {
+                        mobileShootSystem.lastShotTime = Date.now();
+                        game.player.shootMobile(shootAngle);
+                    }
+                }
+            };
+            
             // Atualizar loop de tiro touch
             setInterval(() => {
                 if (isShootingTouch && game.isPlaying && game.player) {
-                    game.player.shoot();
+                    mobileShootSystem.shoot();
                 }
-            }, 100);
+            }, 50); // Verifica a cada 50ms para melhor responsividade
+            
+            // Lógica de mira mobile no update do jogador
+            const originalPlayerUpdate = Player.prototype.update;
+            Player.prototype.update = function() {
+                originalPlayerUpdate.call(this);
+                
+                // Sistema de mira mobile avançado
+                if (game.isMobile && isAimingMobile) {
+                    // Usa o ângulo calculado pelo joystick de tiro
+                    this.angle = shootAngle;
+                    
+                    // Atualiza crosshair baseado no ângulo
+                    const centerX = game.width / 2;
+                    const centerY = game.height / 2;
+                    const radius = 100; // Raio do crosshair
+                    
+                    const crosshairX = centerX + Math.cos(shootAngle) * radius;
+                    const crosshairY = centerY + Math.sin(shootAngle) * radius;
+                    
+                    const crosshair = document.getElementById('crosshair');
+                    if (crosshair) {
+                        crosshair.style.left = crosshairX - 15 + 'px';
+                        crosshair.style.top = crosshairY - 15 + 'px';
+                    }
+                }
+            };
+            
+            // Método de tiro mobile que usa ângulo
+            Player.prototype.shootMobile = function(shootAngle) {
+                if (this.ammo > 0 && !this.isReloading && this.shootCooldown <= 0) {
+                    this.ammo--;
+                    this.shootCooldown = 8;
+                    
+                    const spread = this.isCrouching ? 0.02 : 0.05;
+                    const bulletAngle = shootAngle + (Math.random() - 0.5) * spread;
+                    
+                    const bullet = {
+                        x: this.x,
+                        y: this.y,
+                        vx: Math.cos(bulletAngle) * 20,
+                        vy: Math.sin(bulletAngle) * 20,
+                        damage: this.weapon === 'sniper' ? 50 : 25,
+                        owner: 'player',
+                        ownerName: this.name
+                    };
+                    
+                    game.bullets.push(bullet);
+                    updateHUD();
+                    
+                    if (this.ammo === 0 && this.maxAmmo > 0) {
+                        this.reload();
+                    }
+                }
+            };
         }
     </script>
 </body>
